@@ -1,0 +1,6 @@
+Submission 2b:
+
+You should run SimpleTransaction.java. TxInfo will print debug output whenever it started, a TxObject is added to TxInfo,
+and a TxObject is updated. In this case, you should see that for each thread, TxInfo started exactly once, got updated 5
+times (to 1,2,3,4,5), get the updated value for TxObject exactly once and eventually the final TxObject value without 
+committing is still 0. This proves that TxInfo is doing the lazy buffering without changing the TxObject value.

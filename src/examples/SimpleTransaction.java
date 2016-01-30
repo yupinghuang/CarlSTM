@@ -40,6 +40,9 @@ public class SimpleTransaction {
 						+ " wrote x = " + (val + 1));
 				Thread.yield();
 			}
+			// To prove that lazy buffering is working, print the value field of TxObject for each thread after the operation
+			System.out.println(Thread.currentThread().getName()
+					+ " final TxObject value without committing: " + (x.getTrueTxObjectValue()));
 			return x.read();
 		}
 	}
@@ -58,8 +61,7 @@ public class SimpleTransaction {
 			int result = CarlSTM.execute(new MyTransaction());
 
 			// Should print 5 or 10, depending on which thread went first.
-			System.out
-					.println(Thread.currentThread().getName() + ": " + result);
+			System.out.println(Thread.currentThread().getName() + ": " + result);
 		}
 	}
 

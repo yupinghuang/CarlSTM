@@ -38,8 +38,12 @@ public class CarlSTM {
 	 * @param tx transaction to be executed
 	 * @return result of the transaction
 	 */
+	static final ThreadLocal<TxInfo> TxInfoThreadLocal = new ThreadLocal<TxInfo>();
 	public static <T> T execute(Transaction<T> tx) {
 		// TODO implement me
+		// Initialize the threadTxInfo and start it
+		TxInfoThreadLocal.set(new TxInfo());
+		TxInfoThreadLocal.get().start();
 		try {
 			return tx.run();
 		} catch (NoActiveTransactionException e) {
@@ -48,6 +52,7 @@ public class CarlSTM {
 			return null;
 		} catch (TransactionAbortedException e) {
 			// TODO Auto-generated catch block
+			TxInfoThreadLocal.get().abort();
 			e.printStackTrace();
 			return null;
 		}
