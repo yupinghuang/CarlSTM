@@ -12,6 +12,7 @@ import carlstm.TxObject;
 public class SimpleTransaction {
 	// Create a transactional object that holds an integer.
 	private static TxObject<Integer> x = new TxObject<Integer>(0);
+	private static TxObject<String> y = new TxObject<String>("a");
 
 	/**
 	 * A transaction that repeatedly increments the integer value stored in a
@@ -35,9 +36,13 @@ public class SimpleTransaction {
 			// intervening reads or writes from other threads.
 			for (int i = 0; i < 5; i++) {
 				Integer val = x.read();
+				String valy = y.read();
 				x.write(val + 1);
+				y.write(valy+valy);
 				System.out.println(Thread.currentThread().getName()
 						+ " wrote x = " + (val + 1));
+				System.out.println(Thread.currentThread().getName()
+						+ " wrote y = " + valy + valy);
 				Thread.yield();
 			}
 			// To prove that lazy buffering is working, print the value field of TxObject for each thread after the operation
@@ -61,7 +66,7 @@ public class SimpleTransaction {
 			int result = CarlSTM.execute(new MyTransaction());
 
 			// Should print 5 or 10, depending on which thread went first.
-			System.out.println(Thread.currentThread().getName() + ": " + result);
+			System.out.println(Thread.currentThread().getName() + "x: " + result);
 		}
 	}
 
@@ -69,13 +74,18 @@ public class SimpleTransaction {
 		// Create two threads
 		Thread thread1 = new MyThread();
 		Thread thread2 = new MyThread();
+		Thread thread3 = new MyThread();
+		Thread thread4 = new MyThread();
 
 		// Start the threads (executes MyThread.run)
 		thread1.start();
 		thread2.start();
-
+		thread3.start();
+		thread4.start();
 		// Wait for the threads to finish.
 		thread1.join();
 		thread2.join();
+		thread3.join();
+		thread4.join();
 	}
 }

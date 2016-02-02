@@ -1,4 +1,6 @@
 package carlstm;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * A TxObject is a special kind of object that can be read and written as part
@@ -9,9 +11,11 @@ package carlstm;
  */
 public final class TxObject<T> {
 	T value;
-
+	private Lock lock;
+	
 	public TxObject(T value) {
 		this.value = value;
+		this.lock= new ReentrantLock();
 	}
 
 	@SuppressWarnings("unchecked")
@@ -50,7 +54,22 @@ public final class TxObject<T> {
 			return;
 		}
 	}
-	/** FOR DEBUGGING: print the true value field of the TxObject
+	
+	/** Try to lock this TxObject, return true if locked
+	 * @return boolean locked
+	 */
+	boolean trylock() {
+		return lock.tryLock();
+	}
+	
+	void unlock() {
+		lock.unlock();
+	}
+	@SuppressWarnings("unchecked")
+	void setValue(Object value) {
+		this.value = (T) value;
+	}
+	/** return the true value field of the TxObject
 	 * @return value
 	 */
 	public T getTrueTxObjectValue() {

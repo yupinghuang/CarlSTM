@@ -45,7 +45,9 @@ public class CarlSTM {
 		TxInfoThreadLocal.set(new TxInfo());
 		TxInfoThreadLocal.get().start();
 		try {
-			return tx.run();
+			T result= tx.run();
+			TxInfoThreadLocal.get().commit();
+			return result;
 		} catch (NoActiveTransactionException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

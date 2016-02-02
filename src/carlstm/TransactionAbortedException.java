@@ -6,7 +6,4 @@ package carlstm;
 @SuppressWarnings("serial")
 public class TransactionAbortedException extends Exception {
 
-	public TransactionAbortedException(String s) {
-		super(s);
-	}
 }
