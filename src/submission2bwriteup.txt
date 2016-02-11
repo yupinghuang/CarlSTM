@@ -1,0 +1,4 @@
+Submission 2b:
+
+I added the commit line to CarlSTM, a few methods in TxInfo and TxObject in order to implement commit and abort.
+You may run SimpleTransaction.java, which will print the debug output (although messy).
