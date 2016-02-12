@@ -25,6 +25,11 @@ class TxInfo {
 		return currentTxActive;
 	}
 
+	/**
+	 * Initialize the thread transaction
+	 * 
+	 * @throws TransactionAlreadyActiveException
+	 */
 	void start() throws TransactionAlreadyActiveException {
 		if (currentTxActive) {
 			throw new TransactionAlreadyActiveException();
@@ -42,7 +47,10 @@ class TxInfo {
 	 * Try to commit a completed transaction. This method should update any
 	 * written TxObjects, acquiring locks on those objects as needed.
 	 * 
-	 * @return true if the commit succeeds, false if the transaction aborted
+	 * @return true if the commit succeeds, false if the transaction fails
+	 *         unmanageably
+	 * @throws TransactionAbortedException
+	 *             if the commit aborts
 	 */
 	@SuppressWarnings({})
 	boolean commit() throws TransactionAbortedException {
@@ -109,6 +117,12 @@ class TxInfo {
 	}
 
 	@SuppressWarnings("rawtypes")
+	/**
+	 * Check if a TxObject object is registered with the thread TxInfo
+	 * 
+	 * @param txobject
+	 * @return registered
+	 */
 	boolean hasTxObject(TxObject txobject) {
 		if (initialValues.containsKey(txobject)) {
 			return true;
@@ -118,6 +132,11 @@ class TxInfo {
 	}
 
 	@SuppressWarnings("rawtypes")
+	/**
+	 * Register a TxObject with the TxInfo
+	 * 
+	 * @param txobject
+	 */
 	void addTxObject(TxObject txobject) {
 		initialValues.put(txobject, txobject.value);
 		currentValues.put(txobject, txobject.value);
@@ -127,6 +146,13 @@ class TxInfo {
 	}
 
 	@SuppressWarnings("rawtypes")
+	/**
+	 * Lazy buffer the changes made to a TxObject
+	 * 
+	 * @param txobject
+	 * @param value
+	 * @throws TransactionAbortedException
+	 */
 	void editTxObject(TxObject txobject, Object value) throws TransactionAbortedException {
 		if (!currentValues.containsKey(txobject)) {
 			throw new TransactionAbortedException();
