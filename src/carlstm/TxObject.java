@@ -1,10 +1,8 @@
 package carlstm;
 
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * A TxObject is a special kind of object that can be read and written as part
@@ -26,6 +24,13 @@ public final class TxObject<T> {
 		this.writeLock = rwLock.writeLock();
 	}
 
+	/**
+	 * Get the current value of the TxObject inside the transaction
+	 * 
+	 * @return
+	 * @throws NoActiveTransactionException
+	 * @throws TransactionAbortedException
+	 */
 	@SuppressWarnings("unchecked")
 	public T read() throws NoActiveTransactionException, TransactionAbortedException {
 		// If threadTxInfo if null, it means that this TxOject is not registered
@@ -38,6 +43,14 @@ public final class TxObject<T> {
 		return currentValue;
 	}
 
+	/**
+	 * Change the value of a TxObject inside the transaction, lazy buffer is
+	 * used
+	 * 
+	 * @param value
+	 * @throws NoActiveTransactionException
+	 * @throws TransactionAbortedException
+	 */
 	public void write(T value) throws NoActiveTransactionException, TransactionAbortedException {
 		registerTxObject();
 		TxInfo threadTxInfo = CarlSTM.TxInfoThreadLocal.get();
@@ -45,6 +58,11 @@ public final class TxObject<T> {
 		threadTxInfo.editTxObject(this, value);
 	}
 
+	/**
+	 * Helper function to make sure that there is an active transaction running
+	 * 
+	 * @throws NoActiveTransactionException
+	 */
 	private void checkCurrentTransactionActive() throws NoActiveTransactionException {
 		TxInfo threadTxInfo = CarlSTM.TxInfoThreadLocal.get();
 		if (!threadTxInfo.currentTransactionActive()) {
@@ -54,6 +72,10 @@ public final class TxObject<T> {
 		}
 	}
 
+	/**
+	 * Register the TxObject with the current thread TxInfo
+	 * 
+	 */
 	private void registerTxObject() {
 		TxInfo threadTxInfo = CarlSTM.TxInfoThreadLocal.get();
 		if (!threadTxInfo.hasTxObject(this)) {
@@ -62,9 +84,11 @@ public final class TxObject<T> {
 			return;
 		}
 	}
+
 	public void lockRead() {
 		readLock.lock();
 	}
+
 	public boolean tryLockRead() {
 		return readLock.tryLock();
 	}
