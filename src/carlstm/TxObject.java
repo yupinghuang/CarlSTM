@@ -1,5 +1,9 @@
 package carlstm;
+
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -11,65 +15,90 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public final class TxObject<T> {
 	T value;
-	private Lock lock;
-	
+	private ReentrantReadWriteLock rwLock;
+	private ReadLock readLock;
+	private WriteLock writeLock;
+
 	public TxObject(T value) {
 		this.value = value;
-		this.lock= new ReentrantLock();
+		this.rwLock = new ReentrantReadWriteLock();
+		this.readLock = rwLock.readLock();
+		this.writeLock = rwLock.writeLock();
 	}
 
 	@SuppressWarnings("unchecked")
 	public T read() throws NoActiveTransactionException, TransactionAbortedException {
-		// If threadTxInfo if null, it means that this TxOject is not registered with the TxInfo yet (i.e. first time read/write)
+		// If threadTxInfo if null, it means that this TxOject is not registered
+		// with the TxInfo yet (i.e. first time read/write)
 		registerTxObject();
 		TxInfo threadTxInfo = CarlSTM.TxInfoThreadLocal.get();
 		checkCurrentTransactionActive();
-		//TODO not sure about this casting
+		// TODO not sure about this casting
 		T currentValue = (T) threadTxInfo.readTxObjectCurrentValue(this);
 		return currentValue;
 	}
 
 	public void write(T value) throws NoActiveTransactionException, TransactionAbortedException {
-		// TODO implement me
 		registerTxObject();
 		TxInfo threadTxInfo = CarlSTM.TxInfoThreadLocal.get();
 		checkCurrentTransactionActive();
 		threadTxInfo.editTxObject(this, value);
 	}
-	
+
 	private void checkCurrentTransactionActive() throws NoActiveTransactionException {
 		TxInfo threadTxInfo = CarlSTM.TxInfoThreadLocal.get();
 		if (!threadTxInfo.currentTransactionActive()) {
 			throw new NoActiveTransactionException();
-		}else{
-				return;
-			}
+		} else {
+			return;
+		}
 	}
-	
+
 	private void registerTxObject() {
 		TxInfo threadTxInfo = CarlSTM.TxInfoThreadLocal.get();
 		if (!threadTxInfo.hasTxObject(this)) {
 			threadTxInfo.addTxObject(this);
-		}else{
+		} else {
 			return;
 		}
 	}
-	
-	/** Try to lock this TxObject, return true if locked
-	 * @return boolean locked
-	 */
-	boolean trylock() {
-		return lock.tryLock();
+	public void lockRead() {
+		readLock.lock();
 	}
-	
-	void unlock() {
-		lock.unlock();
+	public boolean tryLockRead() {
+		return readLock.tryLock();
 	}
+
+	public void releaseRead() {
+		try {
+			readLock.unlock();
+		} catch (IllegalMonitorStateException e) {
+
+		}
+	}
+
+	public void lockWrite() {
+		try {
+			writeLock.lock();
+		} catch (Exception e) {
+		}
+	}
+
+	public void releaseWrite() {
+		try {
+			writeLock.unlock();
+		} catch (Exception e) {
+		}
+	}
+
 	@SuppressWarnings("unchecked")
 	void setValue(Object value) {
 		this.value = (T) value;
 	}
-	/** return the true value field of the TxObject
+
+	/**
+	 * return the true value field of the TxObject
+	 * 
 	 * @return value
 	 */
 	public T getTrueTxObjectValue() {

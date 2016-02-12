@@ -25,8 +25,7 @@ public class SimpleTransaction {
 		 * @see carlstm.Transaction#run()
 		 */
 		@Override
-		public Integer run() throws NoActiveTransactionException,
-				TransactionAbortedException {
+		public Integer run() throws NoActiveTransactionException, TransactionAbortedException {
 			// This print may happen more than once if the transaction aborts
 			// and restarts.
 
@@ -36,18 +35,14 @@ public class SimpleTransaction {
 			// intervening reads or writes from other threads.
 			for (int i = 0; i < 5; i++) {
 				Integer val = x.read();
-				String valy = y.read();
+				// String valy = y.read();
 				x.write(val + 1);
-				y.write(valy+valy);
-				System.out.println(Thread.currentThread().getName()
-						+ " wrote x = " + (val + 1));
-				System.out.println(Thread.currentThread().getName()
-						+ " wrote y = " + valy + valy);
+				// y.write(valy+valy);
+				System.out.println(Thread.currentThread().getName() + " wrote x = " + (val + 1));
+				// System.out.println(Thread.currentThread().getName()
+				// + " wrote y = " + valy + valy);
 				Thread.yield();
 			}
-			// To prove that lazy buffering is working, print the value field of TxObject for each thread after the operation
-			System.out.println(Thread.currentThread().getName()
-					+ " final TxObject value without committing: " + (x.getTrueTxObjectValue()));
 			return x.read();
 		}
 	}
@@ -63,10 +58,11 @@ public class SimpleTransaction {
 		 */
 		@Override
 		public void run() {
-			int result = CarlSTM.execute(new MyTransaction());
-
+			Integer result = CarlSTM.execute(new MyTransaction());
 			// Should print 5 or 10, depending on which thread went first.
-			System.out.println(Thread.currentThread().getName() + "x: " + result);
+			if (result != null) {
+				System.out.println(Thread.currentThread().getName() + "x: " + result);
+			}
 		}
 	}
 

@@ -19,7 +19,7 @@ class TxInfo {
 	private HashMap<TxObject<?>, Object> initialValues;
 	private HashMap<TxObject<?>, Object> currentValues;
 	private LinkedList<TxObject<?>> lockedTxObjects;
-	private static final boolean DEBUG = true;
+	private static final boolean DEBUG = false;
 
 	boolean currentTransactionActive() {
 		return currentTxActive;
@@ -45,48 +45,67 @@ class TxInfo {
 	 * @return true if the commit succeeds, false if the transaction aborted
 	 */
 	@SuppressWarnings({})
-	boolean commit() throws TransactionAbortedException{
-		// Try to lock all TxObjects registered in this thread.
-		// If one of the TxObjects is already locked, abort
-		for (TxObject<?> txobject : initialValues.keySet()) {
-			// The following statement checks if the current state of the
-			// TxObject matches the recorded initial state after locking it
-			// if not, abort
-			if (txobject.trylock() && txobject.getTrueTxObjectValue() == initialValues.get(txobject)) {
+	boolean commit() throws TransactionAbortedException {
+		try {
+			for (TxObject<?> txobject : initialValues.keySet()) {
+				// Attempt to read lock on all of the objects registered.
+				// if one attempt fails, abort
+				txobject.lockRead();
 				lockedTxObjects.add(txobject);
-			} else {
-				throw new TransactionAbortedException();
 			}
-		}
-		// Now all TxObjects should be locked, overwrite the values
-		for (TxObject<?> txobject : initialValues.keySet()) {
-			txobject.setValue(currentValues.get(txobject));
-		}
-		unlockAll();
-		if (DEBUG) {
+			// Check if the object value matches the current value registered,
+			// if so, release the readlock, if not, aquires the writelock and
+			// overwrite it
+			for (TxObject<?> txobject : initialValues.keySet()) {
+				if (txobject.getTrueTxObjectValue() != initialValues.get(txobject)) {
+					// inconsistent state
+					throw new TransactionAbortedException();
+				} else {
+					if (txobject.getTrueTxObjectValue() == currentValues.get(txobject)) {
+						txobject.releaseRead();
+					} else {
+						try {
+							txobject.releaseRead();
+							txobject.lockWrite();
+							if (txobject.getTrueTxObjectValue() != initialValues.get(txobject)) {
+								throw new TransactionAbortedException();
+							} else {
+								txobject.setValue(currentValues.get(txobject));
+							}
+						} finally {
+							txobject.releaseWrite();
+						}
+					}
+				}
+			}
 			System.out.println(Thread.currentThread().getName() + " transaction committed");
+		} finally {
+			unlockAll();
 		}
 		return true;
 	}
 
+	/**
+	 * Unlock all the readLocks acquired in this thread
+	 */
 	private void unlockAll() {
-		for (TxObject<?> txobject:lockedTxObjects) {
-			txobject.unlock();
+		for (TxObject<?> txobject : lockedTxObjects) {
+			txobject.releaseRead();
 		}
 		lockedTxObjects.clear();
 	}
+
 	/**
 	 * This method cleans up any transactional state if a transaction aborts.
-	 * Also unlock all TxObjects associated
+	 * Also unlock all TxObjects that have been readlock'ed (and maybe already
+	 * unlocked
 	 */
 	void abort() {
 		unlockAll();
 		currentTxActive = false;
 		currentValues.clear();
 		initialValues.clear();
-		if (DEBUG) {
-			System.out.println(Thread.currentThread().getName() + " transaction aborted");
-		}
+		System.out.println(Thread.currentThread().getName() + " transaction aborted");
 	}
 
 	@SuppressWarnings("rawtypes")
