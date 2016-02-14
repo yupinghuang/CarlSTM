@@ -67,21 +67,16 @@ public class SimpleTransaction {
 	}
 
 	public static void main(String[] args) throws InterruptedException {
-		// Create two threads
-		Thread thread1 = new MyThread();
-		Thread thread2 = new MyThread();
-		Thread thread3 = new MyThread();
-		Thread thread4 = new MyThread();
-
+		// Create an array of threads
+		Thread[] threads = new MyThread[10];
 		// Start the threads (executes MyThread.run)
-		thread1.start();
-		thread2.start();
-		thread3.start();
-		thread4.start();
+		for (int i=0;i<threads.length;i++) {
+			threads[i] = new MyThread();
+			threads[i].start();
+		}
 		// Wait for the threads to finish.
-		thread1.join();
-		thread2.join();
-		thread3.join();
-		thread4.join();
+		for (int i=0;i<threads.length;i++) {
+			threads[i].join();
+		}
 	}
 }
