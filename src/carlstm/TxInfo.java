@@ -20,6 +20,9 @@ class TxInfo {
 	private HashMap<TxObject<?>, Object> currentValues;
 	private LinkedList<TxObject<?>> lockedTxObjects;
 	private static final boolean DEBUG = false;
+	// Variable indicating if another thread is holding the writeLock, if
+	// shouldWait is true, then exponential backoff should be used
+	public boolean shouldWait;
 
 	boolean currentTransactionActive() {
 		return currentTxActive;
@@ -38,6 +41,7 @@ class TxInfo {
 		initialValues = new HashMap<>();
 		lockedTxObjects = new LinkedList<>();
 		currentTxActive = true;
+		shouldWait = false;
 		if (DEBUG) {
 			System.out.println(Thread.currentThread().getName() + " TxInfo started");
 		}
@@ -56,10 +60,14 @@ class TxInfo {
 	boolean commit() throws TransactionAbortedException {
 		try {
 			for (TxObject<?> txobject : initialValues.keySet()) {
-				// Attempt to read lock on all of the objects registered.
-				// if one attempt fails, abort
-				txobject.lockRead();
-				lockedTxObjects.add(txobject);
+				// Try readlock, if unable to readlock, then use exponential backoff
+				if (!txobject.tryLockRead()) {
+					shouldWait = true;
+					throw new TransactionAbortedException();
+				} else {
+					// locked
+					lockedTxObjects.add(txobject);
+				}
 			}
 			// Check if the object value matches the current value registered,
 			// if so, release the readlock, if not, aquires the writelock and
@@ -76,6 +84,7 @@ class TxInfo {
 							txobject.releaseRead();
 							txobject.lockWrite();
 							if (txobject.getTrueTxObjectValue() != initialValues.get(txobject)) {
+								// inconsistent state
 								throw new TransactionAbortedException();
 							} else {
 								txobject.setValue(currentValues.get(txobject));
@@ -86,7 +95,9 @@ class TxInfo {
 					}
 				}
 			}
-			System.out.println(Thread.currentThread().getName() + " transaction committed");
+			if (DEBUG) {
+				System.out.println(Thread.currentThread().getName() + " transaction committed");
+			}
 		} finally {
 			unlockAll();
 		}
@@ -153,12 +164,8 @@ class TxInfo {
 	 * @param value
 	 * @throws TransactionAbortedException
 	 */
-	void editTxObject(TxObject txobject, Object value) throws TransactionAbortedException {
-		if (!currentValues.containsKey(txobject)) {
-			throw new TransactionAbortedException();
-		} else {
-			currentValues.put(txobject, value);
-		}
+	void editTxObject(TxObject txobject, Object value) {
+		currentValues.put(txobject, value);
 		if (DEBUG) {
 			System.out.println(Thread.currentThread().getName() + " Txobject value updated to " + value);
 		}

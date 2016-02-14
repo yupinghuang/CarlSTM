@@ -38,7 +38,6 @@ public final class TxObject<T> {
 		registerTxObject();
 		TxInfo threadTxInfo = CarlSTM.TxInfoThreadLocal.get();
 		checkCurrentTransactionActive();
-		// TODO not sure about this casting
 		T currentValue = (T) threadTxInfo.readTxObjectCurrentValue(this);
 		return currentValue;
 	}

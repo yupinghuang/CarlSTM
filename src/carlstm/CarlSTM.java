@@ -61,18 +61,15 @@ public class CarlSTM {
 		} catch (TransactionAbortedException e) {
 			// Exponential backoff
 			TxInfoThreadLocal.get().abort();
-			sleeptime = sleeptime * sleeptimefactor;
-			// Exit if the waiting time is more than 1s.
-			if (sleeptime > TIMEOUT) {
-				System.out.println(Thread.currentThread().getName() + " timeout, now exit");
-				return null;
-			}
-			System.out.println(Thread.currentThread().getName() + " aborted, retry in" + sleeptime + " ms");
-			try {
-				Thread.sleep(sleeptime);
-			} catch (InterruptedException e1) {
-				e1.printStackTrace();
-				return null;
+			if (TxInfoThreadLocal.get().shouldWait) {
+				sleeptime = sleeptime * sleeptimefactor;
+				System.out.println(Thread.currentThread().getName() + " aborted, retry in" + sleeptime + " ms");
+				try {
+					Thread.sleep(sleeptime);
+				} catch (InterruptedException e1) {
+					e1.printStackTrace();
+					return null;
+				}
 			}
 			T result = execute(tx);
 			return result;
