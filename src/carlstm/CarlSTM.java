@@ -1,5 +1,7 @@
 package carlstm;
 
+import java.util.concurrent.TimeUnit;
+
 /**
  * This class coordinates transaction execution. You can execute a transaction
  * using {@link #execute}. For example:
@@ -41,14 +43,24 @@ public class CarlSTM {
 	 */
 	static final ThreadLocal<TxInfo> TxInfoThreadLocal = new ThreadLocal<TxInfo>();
 	// waiting time in case of backoff and the exponential factor
-	private static final long TIMEOUT = 1000;
+	private static final boolean DEBUG = false;
 	private static final long sleeptimefactor = 2;
-	private static long sleeptime = 1;
+	private static ThreadLocal<Long> threadSleepTime = new ThreadLocal<Long>();
+
+	public static void getCounts() {
+		int commitCount = TxInfoThreadLocal.get().commitCount;
+		int abortCount = TxInfoThreadLocal.get().abortCount;
+		System.out.printf(Thread.currentThread().getName() + " Commit count: %d, Abort count: %d\n", commitCount,
+				abortCount);
+	}
 
 	public static <T> T execute(Transaction<T> tx) {
 		// TODO implement me
 		// Initialize the threadTxInfo and start it
-		TxInfoThreadLocal.set(new TxInfo());
+		threadSleepTime.set(new Long(20));
+		if (TxInfoThreadLocal.get() == null) {
+			TxInfoThreadLocal.set(new TxInfo());
+		}
 		TxInfoThreadLocal.get().start();
 		try {
 			T result = tx.run();
@@ -62,10 +74,13 @@ public class CarlSTM {
 			// Exponential backoff
 			TxInfoThreadLocal.get().abort();
 			if (TxInfoThreadLocal.get().shouldWait) {
-				sleeptime = sleeptime * sleeptimefactor;
-				System.out.println(Thread.currentThread().getName() + " aborted, retry in" + sleeptime + " ms");
+				threadSleepTime.set(threadSleepTime.get() * sleeptimefactor);
+				if (DEBUG) {
+					System.out.println(
+							Thread.currentThread().getName() + " aborted, retry in" + threadSleepTime.get() + " us");
+				}
 				try {
-					Thread.sleep(sleeptime);
+					TimeUnit.NANOSECONDS.sleep(threadSleepTime.get());
 				} catch (InterruptedException e1) {
 					e1.printStackTrace();
 					return null;

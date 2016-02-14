@@ -23,6 +23,14 @@ class TxInfo {
 	// Variable indicating if another thread is holding the writeLock, if
 	// shouldWait is true, then exponential backoff should be used
 	public boolean shouldWait;
+	// Count the numbers of commit and aborts
+	public int commitCount;
+	public int abortCount;
+	
+	public TxInfo() {
+		commitCount=0;
+		abortCount=0;
+	}
 
 	boolean currentTransactionActive() {
 		return currentTxActive;
@@ -60,7 +68,8 @@ class TxInfo {
 	boolean commit() throws TransactionAbortedException {
 		try {
 			for (TxObject<?> txobject : initialValues.keySet()) {
-				// Try readlock, if unable to readlock, then use exponential backoff
+				// Try readlock, if unable to readlock, then use exponential
+				// backoff
 				if (!txobject.tryLockRead()) {
 					shouldWait = true;
 					throw new TransactionAbortedException();
@@ -95,6 +104,8 @@ class TxInfo {
 					}
 				}
 			}
+			commitCount+=1;
+			currentTxActive = false;
 			if (DEBUG) {
 				System.out.println(Thread.currentThread().getName() + " transaction committed");
 			}
@@ -120,11 +131,14 @@ class TxInfo {
 	 * unlocked
 	 */
 	void abort() {
+		abortCount+=1;
 		unlockAll();
 		currentTxActive = false;
 		currentValues.clear();
 		initialValues.clear();
-		System.out.println(Thread.currentThread().getName() + " transaction aborted");
+		if (DEBUG) {
+			System.out.println(Thread.currentThread().getName() + " transaction aborted");
+		}
 	}
 
 	@SuppressWarnings("rawtypes")

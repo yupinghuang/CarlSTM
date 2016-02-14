@@ -1,15 +1,15 @@
 package examples;
 
-import java.util.*;
+import carlstm.*;
 
 /**
- * This is a simple implementation of a Hash Set with separate chaining and no
- * rehashing. We've implemented fine locking with a lock for each index
+ * This is a Transactional implementation of a Hash Set with separate chaining
+ * and no rehashing.
  * 
  * @param <T>
  *            type of the objects in the set.
  */
-public class FineHashSet<T> implements Set<T> {
+public class TxHashSet<T> implements Set<T> {
 
 	/**
 	 * Helper class - basically is a linked list of items that happen to map to
@@ -46,47 +46,50 @@ public class FineHashSet<T> implements Set<T> {
 	 * Our array of items. Each location in the array stores a linked list items
 	 * that hash to that locations.
 	 */
-	private Bucket[] table;
+	private TxObject<Bucket>[] table;
 
 	/**
 	 * Capacity of the array. Since we do not support resizing, this is a
 	 * constant.
 	 */
-	private static final int CAPACITY = 1024;
-
-	/**
-	 * The lock array with a lock for each index of the array
-	 */
-	private Object[] lockArray;
+	private static final int CAPACITY = 15;
 
 	/**
 	 * Create a new HashSet.
 	 */
-	public FineHashSet() {
-		this.table = new Bucket[CAPACITY];
-		this.lockArray = new Object[CAPACITY];
-		for (int i = 0; i < lockArray.length; i++) {
-			lockArray[i] = new Object();
+	@SuppressWarnings("unchecked")
+	public TxHashSet() {
+		this.table = new TxObject[CAPACITY];
+		// Initialize the TxObject's
+		for (int i = 0; i < table.length; i++) {
+			table[i] = new TxObject<Bucket>(null);
 		}
+
 	}
 
 	/**
-	 * A helper method to see if an item is stored at a given bucket.
+	 * A helper method wrapped by transaction to see if a bucket has a given
+	 * item
 	 * 
-	 * @param bucket
-	 *            bucket to be searched
+	 * @param bucketTxObject
 	 * @param item
-	 *            item to be searched for
-	 * @return true if the item is in the bucket
+	 * @return
 	 */
-	private boolean contains(Bucket bucket, T item) {
-		while (bucket != null) {
-			if (item.equals(bucket.item)) {
-				return true;
+	private boolean contains(TxObject<Bucket> bucketTxObject, T item) {
+		Boolean result = CarlSTM.execute(new Transaction<Boolean>() {
+			@Override
+			public Boolean run() throws NoActiveTransactionException, TransactionAbortedException {
+				Bucket bucket = (Bucket) bucketTxObject.read();
+				while (bucket != null) {
+					if (item.equals(bucket.item)) {
+						return true;
+					}
+					bucket = bucket.next;
+				}
+				return false;
 			}
-			bucket = bucket.next;
-		}
-		return false;
+		});
+		return result;
 	}
 
 	/*
@@ -99,14 +102,22 @@ public class FineHashSet<T> implements Set<T> {
 		// Java returns a negative number for the hash; this is just converting
 		// the negative number to a location in the array.
 		int hash = (item.hashCode() % CAPACITY + CAPACITY) % CAPACITY;
-		// For each write to a bucket, we lock the corresponding lock
-		synchronized (lockArray[hash]) {
-			Bucket bucket = table[hash];
-			if (contains(bucket, item)) {
-				return false;
-			}
-			table[hash] = new Bucket(item, bucket);
-			return true;
+		TxObject<Bucket> bucketTxObject = table[hash];
+		// the query is a transaction
+		if (contains(bucketTxObject, item)) {
+			return false;
+		} else {
+			// the insertion is a transaction
+			Boolean result = CarlSTM.execute(new Transaction<Boolean>() {
+				@Override
+				public Boolean run() throws NoActiveTransactionException, TransactionAbortedException {
+					Bucket bucket = (Bucket) bucketTxObject.read();
+					bucket = new Bucket(item, bucket);
+					bucketTxObject.write(bucket);
+					return true;
+				}
+			});
+			return result;
 		}
 	}
 
@@ -118,27 +129,21 @@ public class FineHashSet<T> implements Set<T> {
 	@Override
 	public boolean contains(T item) {
 		int hash = (item.hashCode() % CAPACITY + CAPACITY) % CAPACITY;
-		// lock the corresponding lock to ensure consistency during the query
-		// There is no need to lock in contains(bucket, item) since each
-		// function
-		// that calls it has a lock
-		synchronized (lockArray[hash]) {
-			Bucket bucket = table[hash];
-			return contains(bucket, item);
-		}
+		TxObject<Bucket> bucketTxObject = table[hash];
+		return contains(bucketTxObject, item);
 	}
 
 	/**
 	 * test the class with multithreading
 	 */
 	public static void main(String[] args) throws InterruptedException {
-		final int NUM_THREADS = 40;
-		FineHashSet<Integer> c = new FineHashSet<Integer>();
-		testFineHashSet[] threads = new testFineHashSet[NUM_THREADS];
+		final int NUM_THREADS = 15;
+		TxHashSet<Integer> c = new TxHashSet<Integer>();
+		TestTxHashSet[] threads = new TestTxHashSet[NUM_THREADS];
 		for (int j = 0; j < NUM_THREADS; j++) {
-			threads[j] = new testFineHashSet(j * 6000, (j + 1) * 6000, c);
+			threads[j] = new TestTxHashSet(j * 6000, (j + 1) * 6000, c);
 		}
-        long startTime = System.currentTimeMillis();
+		// long startTime = System.currentTimeMillis();
 		for (int j = 0; j < NUM_THREADS; j++) {
 			threads[j].start();
 		}
@@ -150,18 +155,18 @@ public class FineHashSet<T> implements Set<T> {
 				System.out.printf("Still missing %d\n", i);
 			}
 		}
-        long endTime = System.currentTimeMillis();
-		System.out.println(endTime-startTime);
+		// long endTime = System.currentTimeMillis();
+		// System.out.println(endTime - startTime);
 	}
 
 	/**
 	 * inner class to multithread hash set operations using Thread
 	 */
-	static class testFineHashSet extends Thread {
+	static class TestTxHashSet extends Thread {
 		private int low, high;
-		private FineHashSet<Integer> c;
+		private TxHashSet<Integer> c;
 
-		public testFineHashSet(int low, int high, FineHashSet<Integer> c) {
+		public TestTxHashSet(int low, int high, TxHashSet<Integer> c) {
 			this.low = low;
 			this.high = high;
 			this.c = c;
@@ -171,12 +176,14 @@ public class FineHashSet<T> implements Set<T> {
 		public void run() {
 			for (int i = low; i < high; i++) {
 				c.add(i);
+
 			}
 			for (int i = low; i < high; i++) {
 				if (!c.contains(i)) {
 					System.out.printf("%d is missing\n", i);
 				}
 			}
+			CarlSTM.getCounts();
 		}
 	}
 }

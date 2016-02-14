@@ -1,4 +1,5 @@
-Part 2b, 2a and part 1b is independently done by Yuping Huang
+Part 2c, 2b, 2a and part 1b is independently done by Yuping Huang
 Part 1a is a joint effort of Moses Misplon and Yuping Huang
 I consulted the Java ThreadLocal and HashMap documentations.
-I consulted the Java Locks documentation
+I consulted the Java Locks,ReadWriteLock documentation
+I googled for the Thread.sleep(ms) method.
